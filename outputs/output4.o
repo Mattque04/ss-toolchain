@@ -1,0 +1,15 @@
+#SS_OBJECT
+
+[SECTIONS]
+1
+text 4
+00 00 00 00 
+
+[SYMBOLS]
+1
+0 func text 0 LOCAL DEFINED
+
+[RELOCATIONS]
+0
+
+[END]

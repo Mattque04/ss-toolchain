@@ -1,0 +1,19 @@
+#SS_OBJECT
+
+[SECTIONS]
+2
+text 4
+00 00 00 00 
+data 4
+00 00 00 00 
+
+[SYMBOLS]
+2
+0 main text 0 LOCAL DEFINED
+1 ptr data 0 LOCAL DEFINED
+
+[RELOCATIONS]
+1
+data 0 main ABS32
+
+[END]

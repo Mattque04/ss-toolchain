@@ -1,0 +1,20 @@
+#SS_OBJECT
+
+[SECTIONS]
+2
+text 12
+00 00 12 92 00 10 20 80 00 00 00 00 
+data 4
+00 00 00 00 
+
+[SYMBOLS]
+2
+0 main text 0 LOCAL DEFINED
+1 counter data 0 LOCAL DEFINED
+
+[RELOCATIONS]
+2
+text 0 counter DISP12
+text 4 counter DISP12
+
+[END]
