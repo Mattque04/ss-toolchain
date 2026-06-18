@@ -1,0 +1,12 @@
+asembler
+linker
+emulator
+
+*.o
+*.hex
+
+misc/parser.tab.c
+misc/parser.tab.h
+misc/lex.yy.c
+
+outputs/
