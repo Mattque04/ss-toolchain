@@ -405,19 +405,13 @@ void Assembler::emitLdMemRegSymbol(int gprAddr, const std::string& symbolName, i
 {
     int id = getOrCreateSymbol(symbolName);
     Symbol& sym = symbols[id];
-    if (sym.defined && sym.absolute) {
-        emitLdMemRegLiteral(gprAddr, (int32_t)sym.value, gprD);
-        return;
+    if (!sym.defined || !sym.absolute) {
+        throw std::runtime_error(
+            "Symbol in [%reg + symbol] must be absolute and known during assembly: " 
+            + symbolName
+        );
     }
-
-    uint32_t offset = sections[currentSection].data.size();
-
-    // gprD <= mem32[gprAddr + r0 + symbol]
-
-    emitInstruction(0x9, 0x2, gprD, gprAddr, 0, 0);
-
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
-
+    emitLdMemRegLiteral(gprAddr, (int32_t)sym.value, gprD);
 }
 
 void Assembler::emitStMemSymbol(int gprS, const std::string& symbolName)
@@ -454,18 +448,13 @@ void Assembler::emitStMemRegSymbol(int gprS, int gprAddr, const std::string& sym
 {
     int id = getOrCreateSymbol(symbolName);
     Symbol& sym = symbols[id];
-    if (sym.defined && sym.absolute) {
-        emitStMemRegLiteral(gprS, gprAddr, (int32_t)sym.value);
-        return;
+    if (!sym.defined || !sym.absolute) {
+        throw std::runtime_error(
+            "Symbol in [%reg + symbol] must be absolute and known during assembly: " 
+            + symbolName
+        );
     }
-
-    uint32_t offset = sections[currentSection].data.size();
-
-    // mem32[gprAddr + r0 + symbol] <= gprS
-
-    emitInstruction(0x8, 0x0, gprAddr, 0, gprS, 0);
-
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
+    emitStMemRegLiteral(gprS, gprAddr, (int32_t)sym.value);
 }
 
 void Assembler::writeObjectFile(const std::string& filename)
