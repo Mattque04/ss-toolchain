@@ -247,8 +247,7 @@ void Assembler::emitRet()
 void Assembler::emitIret()
 {
     // pop pc; pop status;
-    emitInstruction(0x9, 0x3, 15, 14, 0, 4);  // pop pc
-    emitInstruction(0x9, 0x7, 0, 14, 0, 4);   // pop status
+    emitInstruction(0x9, 0x8, 0, 0, 0, 0);
 }
 
 void Assembler::emitCsrrd(int csr, int gpr)
@@ -298,7 +297,7 @@ void Assembler::emitCallSymbol(const std::string& symbolName)
 {
     getOrCreateSymbol(symbolName);
     uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x2, 0x0, 0, 0, 0, 0);
+    emitInstruction(0x2, 0x0, 15, 0, 0, 0);
     relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
 }
 
@@ -306,7 +305,7 @@ void Assembler::emitJmpSymbol(const std::string& symbolName)
 {
     getOrCreateSymbol(symbolName);
     uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x0, 0, 0, 0, 0);
+    emitInstruction(0x3, 0x0, 15, 0, 0, 0);
     relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
 }
 
@@ -314,7 +313,7 @@ void Assembler::emitBeqSymbol(int r1, int r2, const std::string& symbolName)
 {
     getOrCreateSymbol(symbolName);
     uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x1, 0, r1, r2, 0);
+    emitInstruction(0x3, 0x1, 15, r1, r2, 0);
     relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
 }
 
@@ -322,7 +321,7 @@ void Assembler::emitBneSymbol(int r1, int r2, const std::string& symbolName)
 {
     getOrCreateSymbol(symbolName);
     uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x2, 0, r1, r2, 0);
+    emitInstruction(0x3, 0x2, 15, r1, r2, 0);
     relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
 }
 
@@ -330,7 +329,7 @@ void Assembler::emitBgtSymbol(int r1, int r2, const std::string& symbolName)
 {
     getOrCreateSymbol(symbolName);
     uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x3, 0, r1, r2, 0);
+    emitInstruction(0x3, 0x3, 15, r1, r2, 0);
     relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
 }
 
@@ -363,41 +362,20 @@ void Assembler::emitLdMemRegLiteral(int gprAddr, int32_t disp, int gprD)
 }
 
 void Assembler::emitLdImmediateSymbol(const std::string& symbolName, int gprD)
+
 {
-    int id = getOrCreateSymbol(symbolName);
-    Symbol& sym = symbols[id];
 
-    if (sym.defined && sym.absolute) {
-        emitLdImmediateLiteral((int32_t)sym.value, gprD);
-        return;
-    }
+    emitLoadSymbolAddress(symbolName, gprD);
 
-    // ld [%pc + 4], gprD
-    emitInstruction(0x9, 0x2, gprD, 15, 0, 4);
-
-    // jmp 8
-    emitInstruction(0x3, 0x0, 15, 0, 0, 8);
-
-    // literal pool entry
-    emitWordSymbol(symbolName);
 }
-
 void Assembler::emitLdMemSymbol(const std::string& symbolName, int gprD)
+
 {
-    int id = getOrCreateSymbol(symbolName);
-    Symbol& sym = symbols[id];
 
-    if (sym.defined && sym.absolute) {
-        // load value from absolute address
-        emitInstruction(0x9, 0x2, gprD, 0, 0, (int32_t)sym.value);
-        return;
-    }
+    emitLoadSymbolAddress(symbolName, gprD);
 
-    // first load address of symbol into gprD
-    emitLdImmediateSymbol(symbolName, gprD);
-
-    // then load from memory at that address
     emitLdMemReg(gprD, gprD);
+
 }
 
 void Assembler::emitLdMemRegSymbol(int gprAddr, const std::string& symbolName, int gprD)
@@ -415,20 +393,13 @@ void Assembler::emitLdMemRegSymbol(int gprAddr, const std::string& symbolName, i
 }
 
 void Assembler::emitStMemSymbol(int gprS, const std::string& symbolName)
+
 {
-    int id = getOrCreateSymbol(symbolName);
-    Symbol& sym = symbols[id];
 
-    if (sym.defined && sym.absolute) {
-        emitInstruction(0x8, 0x0, 0, 0, gprS, (int32_t)sym.value);
-        return;
-    }
+    emitLoadSymbolAddress(symbolName, 13);
 
-    // use temporary register r13 for address
-    emitLdImmediateSymbol(symbolName, 13);
-
-    // store gprS to memory[r13]
     emitStMemReg(gprS, 13);
+
 }
 
 void Assembler::emitStMemReg(int gprS, int gprAddr)
@@ -603,4 +574,31 @@ uint32_t Assembler::getAbsoluteSymbolValue(const std::string& name)
     }
 
     return sym.value;
+}
+
+void Assembler::emitLoadAddress(uint32_t value, int gprD)
+{
+    if ((int32_t)value >= -2048 && (int32_t)value <= 2047) {
+        emitLdImmediateLiteral((int32_t)value, gprD);
+        return;
+    }
+
+    emitInstruction(0x9, 0x2, gprD, 15, 0, 4);
+    emitInstruction(0x3, 0x0, 15, 0, 0, 4);
+    emitWord(value);
+}
+
+void Assembler::emitLoadSymbolAddress(const std::string& symbolName, int gprD)
+{
+    int id = getOrCreateSymbol(symbolName);
+    Symbol& sym = symbols[id];
+
+    if (sym.defined && sym.absolute) {
+        emitLoadAddress(sym.value, gprD);
+        return;
+    }
+
+    emitInstruction(0x9, 0x2, gprD, 15, 0, 4);
+    emitInstruction(0x3, 0x0, 15, 0, 0, 4);
+    emitWordSymbol(symbolName);
 }

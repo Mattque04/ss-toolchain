@@ -4,10 +4,10 @@
 #include <iostream>
 #include <string>
 
+Assembler assembler;
 extern int yyparse();
 extern FILE* yyin;
 
-Assembler assembler;
 
 int main(int argc, char** argv)
 {

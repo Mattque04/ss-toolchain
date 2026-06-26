@@ -1,15 +1,18 @@
+.equ term_in, 0xFFFFFF04
 .equ term_out, 0xFFFFFF00
 
-.equ x, 5 + 3 * 2
+.section text
 
-.equ y, (x + 1) * 4
+main:
+    ld $handler, %r1
+    csrwr %r1, %handler
 
-.section data
+loop:
+    jmp loop
 
-.word term_out
-
-.word x
-
-.word y
+handler:
+    ld term_in, %r1
+    st %r1, term_out
+    iret
 
 .end

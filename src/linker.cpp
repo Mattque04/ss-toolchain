@@ -490,7 +490,7 @@ void Linker::resolveRelocations()
         {
             uint32_t instrAddress = sectionBases[rel.section] + rel.offset;
 
-            int32_t disp = (int32_t)symbolAddress - (int32_t)instrAddress;
+            int32_t disp = (int32_t)symbolAddress - ((int32_t)instrAddress+4);
 
             if (disp < -2048 || disp > 2047) {
                 throw std::runtime_error("DISP12 relocation out of range for symbol: " + rel.symbol);

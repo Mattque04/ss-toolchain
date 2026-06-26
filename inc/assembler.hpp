@@ -176,6 +176,9 @@ private:
     // vraca postojeci simbol ili pravi novi
     int getOrCreateSymbol(const std::string& name);
 
+    void emitLoadAddress(uint32_t value, int gprD);
+    void emitLoadSymbolAddress(const std::string& symbolName, int gprD);
+
     std::vector<Section> sections;
     std::vector<Symbol> symbols;
     std::vector<Relocation> relocations;
