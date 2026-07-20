@@ -113,6 +113,19 @@ void Linker::printObjectFile(const ObjectFile& obj)
     }
 }
 
+static bool globalSymbolExists(
+      const std::vector<GlobalSymbol>& symbols,
+      const std::string& name)
+  {
+      for (const auto& symbol : symbols) {
+          if (symbol.global && symbol.name == name) {
+              return true;
+          }
+      }
+
+      return false;
+  }
+
 static LinkSection* findSection(std::vector<LinkSection>& sections, const std::string& name)
 {
     for (auto& sec : sections) {
@@ -204,19 +217,6 @@ static const SectionPlacement* findPlacement(const std::vector<SectionPlacement>
     return nullptr;
 }
 
-static bool symbolExists(
-    const std::vector<GlobalSymbol>& symbols,
-    const std::string& name)
-{
-    for (const auto& s : symbols) {
-        if (s.name == name) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 void Linker::buildGlobalSymbolTable()
 {
     globalSymbols.clear();
@@ -231,7 +231,7 @@ void Linker::buildGlobalSymbolTable()
                 continue;
             }
 
-            if (symbolExists(globalSymbols, sym.name)) {
+            if (sym.global && globalSymbolExists(globalSymbols, sym.name)) {
                 throw std::runtime_error(
                     "Multiple definition of symbol: " + sym.name
                 );
@@ -239,6 +239,7 @@ void Linker::buildGlobalSymbolTable()
             
             GlobalSymbol gs;
             if (sym.section == "ABS") {
+                gs.objectIndex = objIdx;
                 gs.name = sym.name;
                 gs.section = "ABS";
                 gs.value = sym.value;
@@ -255,6 +256,7 @@ void Linker::buildGlobalSymbolTable()
                     sym.section
                 );
             }
+            gs.objectIndex = objIdx;
             gs.name = sym.name;
             gs.section = sym.section;
             gs.value = sym.value + placement->offset;
@@ -300,7 +302,7 @@ void Linker::buildGlobalRelocationTable()
             }
 
             GlobalRelocation gr;
-
+            gr.objectIndex=objIdx;
             gr.section = rel.section;
             gr.symbol = rel.symbol;
 
@@ -318,6 +320,7 @@ void Linker::buildGlobalRelocationTable()
 
         std::cout
             << r.section
+            << " obj=" << r.objectIndex
             << " offset=" << r.offset
             << " symbol=" << r.symbol
             << "\n";
@@ -368,8 +371,10 @@ void Linker::resolveSymbols()
     for (const auto& sym : globalSymbols)
     {   
         ResolvedSymbol rs;
+        rs.global= sym.global;
+        rs.name=sym.name;
+        rs.objectIndex=sym.objectIndex;
         if (sym.section == "ABS") {
-            rs.name = sym.name;
             rs.address = sym.value;
             resolvedSymbols.push_back(rs);
             continue;
@@ -383,40 +388,44 @@ void Linker::resolveSymbols()
                 sym.section
             );
         }
-        rs.name = sym.name;
         rs.address = it->second + sym.value;
-
         resolvedSymbols.push_back(rs);
     }
 
     std::cout << "\n=== RESOLVED SYMBOLS ===\n";
 
-    for (const auto& s : resolvedSymbols)
-    {
-        std::cout
-            << s.name
-            << " -> 0x"
-            << std::hex
-            << s.address
-            << std::dec
-            << "\n";
+    for (const auto& symbol : resolvedSymbols) {
+          std::cout
+              << "obj" << symbol.objectIndex << " "
+              << symbol.name
+              << " -> 0x"
+              << std::hex << symbol.address
+              << std::dec
+              << " global=" << symbol.global
+              << "\n";
     }
 }
 
-uint32_t Linker::findResolvedSymbolAddress(
-    const std::string& name)
+uint32_t Linker::findResolvedSymbolAddress(const std::string& name, int referencingObjectIndex)
 {
-    for (const auto& sym : resolvedSymbols)
-    {
-        if (sym.name == name)
-        {
-            return sym.address;
-        }
-    }
+      // first lookup for local symbols
+      for (const auto& symbol : resolvedSymbols) {
+          if (!symbol.global &&
+              symbol.objectIndex == referencingObjectIndex &&
+              symbol.name == name)
+          {
+              return symbol.address;
+          }
+      }
 
-    throw std::runtime_error(
-        "Unknown symbol: " + name
-    );
+      // second lookup for global symbols
+      for (const auto& symbol : resolvedSymbols) {
+          if (symbol.global && symbol.name == name) {
+              return symbol.address;
+          }
+      }
+
+      throw std::runtime_error("Unknown symbol: " + name);
 }
 
 LinkSection* Linker::findMergedSection(
@@ -455,7 +464,7 @@ void Linker::resolveRelocations()
 {
     for (const auto& rel : globalRelocations)
     {
-        uint32_t symbolAddress = findResolvedSymbolAddress(rel.symbol);
+        uint32_t symbolAddress = findResolvedSymbolAddress(rel.symbol, rel.objectIndex);
 
         LinkSection* section = findMergedSection(rel.section);
         if (!section) {
@@ -536,9 +545,38 @@ void Linker::checkUndefinedSymbols()
 {
     for (const auto& rel : globalRelocations)
     {
-        findResolvedSymbolAddress(rel.symbol);
+        findResolvedSymbolAddress(rel.symbol, rel.objectIndex);
     }
+
+
 }
+ static std::string relocatableSymbolName(
+      const GlobalSymbol& symbol)
+  {
+      if (symbol.global) {
+          return symbol.name;
+      }
+
+      return "__SS_LOCAL_" +
+             std::to_string(symbol.objectIndex) +
+             "_" +
+             symbol.name;
+  }
+
+  static std::string relocatableRelocationTarget(
+      const GlobalRelocation& relocation,
+      const std::vector<GlobalSymbol>& symbols)
+  {
+      for (const auto& symbol : symbols) {
+          if (!symbol.global &&
+              symbol.objectIndex == relocation.objectIndex &&
+              symbol.name == relocation.symbol)
+          {
+              return relocatableSymbolName(symbol);
+          }
+      }
+      return relocation.symbol;
+  }
 
 void Linker::writeRelocatableObject(const std::string& filename)
 {
@@ -571,7 +609,7 @@ void Linker::writeRelocatableObject(const std::string& filename)
         const GlobalSymbol& s = globalSymbols[i];
 
         out << i << " "
-            << s.name << " "
+            << relocatableSymbolName(s) << " "
             << s.section << " "
             << s.value << " "
             << (s.global ? "GLOBAL" : "LOCAL") << " "
@@ -585,7 +623,7 @@ void Linker::writeRelocatableObject(const std::string& filename)
     for (const auto& r : globalRelocations) {
         out << r.section << " "
             << r.offset << " "
-            << r.symbol
+            << relocatableRelocationTarget(r, globalSymbols)
             << "\n";
     }
 

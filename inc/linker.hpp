@@ -42,17 +42,22 @@ struct GlobalSymbol {
     std::string section;
     uint32_t value;
     bool global;
+    int objectIndex;
 };
 
 struct GlobalRelocation {
     std::string section;
     uint32_t offset;
     std::string symbol;
+    int objectIndex;
+
 };
 
 struct ResolvedSymbol {
     std::string name;
     uint32_t address;
+    int objectIndex;
+    bool global;
 };
 
 class Linker {
@@ -85,7 +90,7 @@ public:
 
 private:
 
-    uint32_t findResolvedSymbolAddress(const std::string& name);
+    uint32_t findResolvedSymbolAddress(const std::string& name, int referencingObjectIndex);
 
     LinkSection* findMergedSection(const std::string& name);
 
