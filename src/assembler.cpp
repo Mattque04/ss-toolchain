@@ -66,6 +66,13 @@ int Assembler::getOrCreateSymbol(const std::string& name)
 //Public functions
 void Assembler::startSection(const std::string& name)
 {
+    for (int i = 0; i < (int)sections.size(); i++) {
+        if (sections[i].name == name) {
+            currentSection = i;
+            return;
+        }
+    }
+
     sections.emplace_back(name);
     currentSection = sections.size() - 1;
 }
@@ -116,14 +123,11 @@ void Assembler::emitWord(uint32_t value)
     sec.data.push_back((value >> 16) & 0xFF);
     sec.data.push_back((value >> 24) & 0xFF);
 }
+
 void Assembler::emitWordSymbol(const std::string& symbolName)
-
 {
-
     if (currentSection == -1) {
-
         throw std::runtime_error(".word outside of section");
-
     }
 
     int id=getOrCreateSymbol(symbolName);
@@ -132,20 +136,15 @@ void Assembler::emitWordSymbol(const std::string& symbolName)
         emitWord(sym.value);
         return;
     }
-
     Section& sec = sections[currentSection];
 
     uint32_t offset = sec.data.size();
 
     sec.data.push_back(0);
-
     sec.data.push_back(0);
-
     sec.data.push_back(0);
-
     sec.data.push_back(0);
-
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::ABS32);
+    relocations.emplace_back(currentSection, offset, symbolName);
 
 }
 void Assembler::emitSkip(uint32_t size)
@@ -263,74 +262,60 @@ void Assembler::emitCsrwr(int gpr, int csr)
 }
 
 
-void Assembler::emitCallLiteral(int32_t value)
+void Assembler::emitCallLiteral(uint32_t value)
 {
-    checkDisp12(value);
-    emitInstruction(0x2, 0x0, 0, 0, 0, value);
+      emitInstruction(0x2, 0x1, 15, 0, 0, 4);
+      emitInstruction(0x3, 0x0, 15, 0, 0, 4);
+      emitWord((uint32_t)value);
 }
 
-void Assembler::emitJmpLiteral(int32_t value)
+void Assembler::emitJmpLiteral(uint32_t value)
 {
-    checkDisp12(value);
-    emitInstruction(0x3, 0x0, 0, 0, 0, value);
+      emitInstruction(0x3, 0x8, 15, 0, 0, 0);
+      emitWord((uint32_t)value);
 }
 
-void Assembler::emitBeqLiteral(int r1, int r2, int32_t value)
+void Assembler::emitBeqLiteral(int r1, int r2, uint32_t value)
 {
-    checkDisp12(value);
-    emitInstruction(0x3, 0x1, 0, r1, r2, value);
+    emitBranchLiteral(0x9, r1, r2, (uint32_t)value);
 }
 
-void Assembler::emitBneLiteral(int r1, int r2, int32_t value)
+void Assembler::emitBneLiteral(int r1, int r2, uint32_t value)
 {
-    checkDisp12(value);
-    emitInstruction(0x3, 0x2, 0, r1, r2, value);
+    emitBranchLiteral(0xA, r1, r2, (uint32_t)value);
 }
 
-void Assembler::emitBgtLiteral(int r1, int r2, int32_t value)
+void Assembler::emitBgtLiteral(int r1, int r2, uint32_t value)
 {
-    checkDisp12(value);
-    emitInstruction(0x3, 0x3, 0, r1, r2, value);
+    emitBranchLiteral(0xB, r1, r2, (uint32_t)value);
 }
 
 void Assembler::emitCallSymbol(const std::string& symbolName)
 {
-    getOrCreateSymbol(symbolName);
-    uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x2, 0x0, 15, 0, 0, 0);
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
+      emitInstruction(0x2, 0x1, 15, 0, 0, 4);
+      emitInstruction(0x3, 0x0, 15, 0, 0, 4);
+      emitWordSymbol(symbolName);
 }
 
 void Assembler::emitJmpSymbol(const std::string& symbolName)
 {
-    getOrCreateSymbol(symbolName);
-    uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x0, 15, 0, 0, 0);
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
+      emitInstruction(0x3, 0x8, 15, 0, 0, 0);
+      emitWordSymbol(symbolName);
 }
 
 void Assembler::emitBeqSymbol(int r1, int r2, const std::string& symbolName)
 {
-    getOrCreateSymbol(symbolName);
-    uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x1, 15, r1, r2, 0);
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
+    emitBranchSymbol(0x9, r1, r2, symbolName);
 }
 
 void Assembler::emitBneSymbol(int r1, int r2, const std::string& symbolName)
 {
-    getOrCreateSymbol(symbolName);
-    uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x2, 15, r1, r2, 0);
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
+    emitBranchSymbol(0xA, r1, r2, symbolName);
 }
 
 void Assembler::emitBgtSymbol(int r1, int r2, const std::string& symbolName)
 {
-    getOrCreateSymbol(symbolName);
-    uint32_t offset = sections[currentSection].data.size();
-    emitInstruction(0x3, 0x3, 15, r1, r2, 0);
-    relocations.emplace_back(currentSection, offset, symbolName, RelocationType::DISP12);
+    emitBranchSymbol(0xB, r1, r2, symbolName);
 }
 
 
@@ -483,8 +468,7 @@ void Assembler::writeObjectFile(const std::string& filename)
     for (const Relocation& r : relocations) {
         out << sections[r.sectionId].name << " "
             << r.offset << " "
-            << r.symbol << " "
-            << (r.type == RelocationType::ABS32 ? "ABS32" : "DISP12")
+            << r.symbol
             << "\n";
     }
 
@@ -526,8 +510,6 @@ void Assembler::printState()
               << " offset=" << r.offset
 
               << " symbol=" << r.symbol
-
-              << " type=" << (r.type == RelocationType::ABS32 ? "ABS32" : "DISP12")
 
               << std::endl;
 
@@ -601,4 +583,19 @@ void Assembler::emitLoadSymbolAddress(const std::string& symbolName, int gprD)
     emitInstruction(0x9, 0x2, gprD, 15, 0, 4);
     emitInstruction(0x3, 0x0, 15, 0, 0, 4);
     emitWordSymbol(symbolName);
+}
+
+
+void Assembler::emitBranchLiteral(uint8_t modifier, int r1, int r2, uint32_t value)
+{
+      emitInstruction(0x3, modifier, 15, r1, r2, 4);
+      emitInstruction(0x3, 0x0, 15, 0, 0, 4);
+      emitWord(value);
+}
+
+void Assembler::emitBranchSymbol(uint8_t modifier, int r1, int r2, const std::string& symbolName)
+{
+      emitInstruction(0x3, modifier, 15, r1, r2, 4);
+      emitInstruction(0x3, 0x0, 15, 0, 0, 4);
+      emitWordSymbol(symbolName);
 }

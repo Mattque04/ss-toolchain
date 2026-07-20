@@ -5,11 +5,6 @@
 #include <vector>
 #include <unordered_map>
 
-enum class LinkRelocationType {
-    ABS32,
-    DISP12
-};
-
 struct LinkSection {
     std::string name;
     std::vector<uint8_t> data;
@@ -28,7 +23,6 @@ struct LinkRelocation {
     std::string section;
     uint32_t offset;
     std::string symbol;
-    LinkRelocationType type;
 };
 
 struct ObjectFile {
@@ -38,32 +32,22 @@ struct ObjectFile {
 };
 
 struct SectionPlacement {
-
     int objectIndex;
-
     std::string sectionName;
-
     uint32_t offset;
-
 };
 
 struct GlobalSymbol {
-
     std::string name;
-
     std::string section;
-
     uint32_t value;
-
     bool global;
-
 };
 
 struct GlobalRelocation {
     std::string section;
     uint32_t offset;
     std::string symbol;
-    LinkRelocationType type;
 };
 
 struct ResolvedSymbol {
@@ -107,8 +91,6 @@ private:
 
     void write32(LinkSection& section, uint32_t offset, uint32_t value);
 
-    uint32_t read32(const LinkSection& section, uint32_t offset);
-
     std::vector<GlobalSymbol> globalSymbols;
 
     std::vector<ObjectFile> objectFiles;
@@ -122,7 +104,4 @@ private:
     std::unordered_map<std::string, uint32_t> sectionBases;
 
     std::vector<ResolvedSymbol> resolvedSymbols;
-
-
-
 }; 

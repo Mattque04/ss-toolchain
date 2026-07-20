@@ -72,13 +72,8 @@ ObjectFile Linker::readObjectFile(const std::string& filename)
 
             for (int i = 0; i < count; i++) {
                 LinkRelocation rel;
-                std::string type;
 
-                in >> rel.section >> rel.offset >> rel.symbol >> type;
-
-                rel.type = (type == "ABS32")
-                    ? LinkRelocationType::ABS32
-                    : LinkRelocationType::DISP12;
+                in >> rel.section >> rel.offset >> rel.symbol;
 
                 obj.relocations.push_back(rel);
             }
@@ -114,7 +109,6 @@ void Linker::printObjectFile(const ObjectFile& obj)
         std::cout << "  " << rel.section
                   << " offset=" << rel.offset
                   << " symbol=" << rel.symbol
-                  << " type=" << (rel.type == LinkRelocationType::ABS32 ? "ABS32" : "DISP12")
                   << "\n";
     }
 }
@@ -309,7 +303,6 @@ void Linker::buildGlobalRelocationTable()
 
             gr.section = rel.section;
             gr.symbol = rel.symbol;
-            gr.type = rel.type;
 
             gr.offset =
                 rel.offset +
@@ -327,10 +320,6 @@ void Linker::buildGlobalRelocationTable()
             << r.section
             << " offset=" << r.offset
             << " symbol=" << r.symbol
-            << " type="
-            << (r.type == LinkRelocationType::ABS32
-                    ? "ABS32"
-                    : "DISP12")
             << "\n";
     }
 }
@@ -462,15 +451,6 @@ void Linker::write32(
         (value >> 24) & 0xFF;
 }
 
-uint32_t Linker::read32(const LinkSection& section, uint32_t offset)
-{
-    return
-        ((uint32_t)section.data[offset + 0]) |
-        ((uint32_t)section.data[offset + 1] << 8) |
-        ((uint32_t)section.data[offset + 2] << 16) |
-        ((uint32_t)section.data[offset + 3] << 24);
-}
-
 void Linker::resolveRelocations()
 {
     for (const auto& rel : globalRelocations)
@@ -481,27 +461,9 @@ void Linker::resolveRelocations()
         if (!section) {
             throw std::runtime_error("Missing merged section: " + rel.section);
         }
-
-        if (rel.type == LinkRelocationType::ABS32)
-        {
-            write32(*section, rel.offset, symbolAddress);
-        }
-        else if (rel.type == LinkRelocationType::DISP12)
-        {
-            uint32_t instrAddress = sectionBases[rel.section] + rel.offset;
-
-            int32_t disp = (int32_t)symbolAddress - ((int32_t)instrAddress+4);
-
-            if (disp < -2048 || disp > 2047) {
-                throw std::runtime_error("DISP12 relocation out of range for symbol: " + rel.symbol);
-            }
-
-            uint32_t instr = read32(*section, rel.offset);
-
-            instr = (instr & 0xFFFFF000) | (disp & 0xFFF);
-
-            write32(*section, rel.offset, instr);
-        }
+    
+        write32(*section, rel.offset, symbolAddress);    
+        
     }
 }
 
@@ -623,8 +585,7 @@ void Linker::writeRelocatableObject(const std::string& filename)
     for (const auto& r : globalRelocations) {
         out << r.section << " "
             << r.offset << " "
-            << r.symbol << " "
-            << (r.type == LinkRelocationType::ABS32 ? "ABS32" : "DISP12")
+            << r.symbol
             << "\n";
     }
 

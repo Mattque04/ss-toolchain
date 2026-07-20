@@ -10,3 +10,4 @@ misc/parser.tab.h
 misc/lex.yy.c
 
 outputs/
+*.md

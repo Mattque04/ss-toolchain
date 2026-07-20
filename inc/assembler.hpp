@@ -93,19 +93,19 @@ public:
     void emitCsrwr(int gpr, int csr);
 
     // call 100
-    void emitCallLiteral(int32_t value);
+    void emitCallLiteral(uint32_t value);
 
     // jmp 100
-    void emitJmpLiteral(int32_t value);
+    void emitJmpLiteral(uint32_t value);
 
     // beq %r1, %r2, 100
-    void emitBeqLiteral(int r1, int r2, int32_t value);
+    void emitBeqLiteral(int r1, int r2, uint32_t value);
 
     // bne %r1, %r2, 100
-    void emitBneLiteral(int r1, int r2, int32_t value);
+    void emitBneLiteral(int r1, int r2, uint32_t value);
 
     // bgt %r1, %r2, 100
-    void emitBgtLiteral(int r1, int r2, int32_t value);
+    void emitBgtLiteral(int r1, int r2, uint32_t value);
 
     // call func
     void emitCallSymbol(const std::string& symbolName);
@@ -178,6 +178,8 @@ private:
 
     void emitLoadAddress(uint32_t value, int gprD);
     void emitLoadSymbolAddress(const std::string& symbolName, int gprD);
+    void emitBranchLiteral(uint8_t modifier, int r1, int r2, uint32_t value);
+    void emitBranchSymbol(uint8_t modifier, int r1, int r2, const std::string& symbolName);
 
     std::vector<Section> sections;
     std::vector<Symbol> symbols;

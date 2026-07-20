@@ -195,23 +195,23 @@ instruction:
 
     | CALL NUMBER
       {
-          assembler.emitCallLiteral((int32_t)$2);
+          assembler.emitCallLiteral($2);
       }
     | JMP NUMBER
       {
-          assembler.emitJmpLiteral((int32_t)$2);
+          assembler.emitJmpLiteral($2);
       }
     | BEQ GPR COMMA GPR COMMA NUMBER
       {
-          assembler.emitBeqLiteral($2, $4, (int32_t)$6);
+          assembler.emitBeqLiteral($2, $4, $6);
       }
     | BNE GPR COMMA GPR COMMA NUMBER
       {
-          assembler.emitBneLiteral($2, $4, (int32_t)$6);
+          assembler.emitBneLiteral($2, $4, $6);
       }
     | BGT GPR COMMA GPR COMMA NUMBER
       {
-          assembler.emitBgtLiteral($2, $4, (int32_t)$6);
+          assembler.emitBgtLiteral($2, $4, $6);
       }
 
     | CALL IDENT
