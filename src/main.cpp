@@ -48,7 +48,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    assembler.printState();
+    // assembler.printState();
     assembler.writeObjectFile(outputFile);
 
     return 0;

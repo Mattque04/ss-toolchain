@@ -309,13 +309,13 @@ void Emulator::run()
         //TERMINAL
         if (terminalInterruptPending.load()) {
 
-            std::cerr << "Trying terminal interrupt\n";
+            //std::cerr << "Trying terminal interrupt\n";
 
             bool globalMasked = csr[0] & (1 << 2);
             bool terminalMasked = csr[0] & (1 << 1);
             bool handlerSet = csr[1] != 0;
 
-            std::cerr << "globalMasked=" << globalMasked << " terminalMasked=" << terminalMasked << "\n";
+            //std::cerr << "globalMasked=" << globalMasked << " terminalMasked=" << terminalMasked << "\n";
 
             if (handlerSet && !globalMasked && !terminalMasked) {
                 terminalInterruptPending.store(false);

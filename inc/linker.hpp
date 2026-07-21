@@ -64,8 +64,6 @@ class Linker {
 public:
     ObjectFile readObjectFile(const std::string& filename);
 
-    void printObjectFile(const ObjectFile& obj);
-
     void addObjectFile(const ObjectFile& obj);
 
     void mergeSections();

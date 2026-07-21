@@ -86,33 +86,6 @@ ObjectFile Linker::readObjectFile(const std::string& filename)
     return obj;
 }
 
-void Linker::printObjectFile(const ObjectFile& obj)
-{
-    std::cout << "Sections:\n";
-    for (const auto& sec : obj.sections) {
-        std::cout << "  " << sec.name << " size=" << sec.data.size() << "\n";
-    }
-
-    std::cout << "Symbols:\n";
-    for (const auto& sym : obj.symbols) {
-        std::cout << "  " << sym.name
-                  << " section=" << sym.section
-                  << " value=" << sym.value
-                  << " global=" << sym.global
-                  << " defined=" << sym.defined
-                  << " external=" << sym.external
-                  << "\n";
-    }
-
-    std::cout << "Relocations:\n";
-    for (const auto& rel : obj.relocations) {
-        std::cout << "  " << rel.section
-                  << " offset=" << rel.offset
-                  << " symbol=" << rel.symbol
-                  << "\n";
-    }
-}
-
 static bool globalSymbolExists(
       const std::vector<GlobalSymbol>& symbols,
       const std::string& name)
@@ -176,7 +149,7 @@ void Linker::mergeSections()
         }
     }
 
-    std::cout << "\n=== MERGED SECTIONS ===\n";
+    /*std::cout << "\n=== MERGED SECTIONS ===\n";
 
     for (const auto& sec : mergedSections) {
         std::cout
@@ -196,7 +169,7 @@ void Linker::mergeSections()
             << " -> "
             << p.offset
             << "\n";
-    }
+    }*/
 }
 
 void Linker::addObjectFile(const ObjectFile& obj)
@@ -264,7 +237,7 @@ void Linker::buildGlobalSymbolTable()
             globalSymbols.push_back(gs);
         }
     }
-
+/*
     std::cout << "\n=== GLOBAL SYMBOLS ===\n";
 
     for (const auto& s : globalSymbols) {
@@ -274,7 +247,7 @@ void Linker::buildGlobalSymbolTable()
             << " value=" << s.value
             << " global=" << s.global
             << "\n";
-    }
+    }*/
 }
 
 void Linker::buildGlobalRelocationTable()
@@ -313,7 +286,7 @@ void Linker::buildGlobalRelocationTable()
             globalRelocations.push_back(gr);
         }
     }
-
+/*
     std::cout << "\n=== GLOBAL RELOCATIONS ===\n";
 
     for (const auto& r : globalRelocations) {
@@ -324,7 +297,7 @@ void Linker::buildGlobalRelocationTable()
             << " offset=" << r.offset
             << " symbol=" << r.symbol
             << "\n";
-    }
+    }*/
 }
 
 void Linker::assignSectionAddresses(
@@ -355,15 +328,16 @@ void Linker::assignSectionAddresses(
             nextAddress += sec.data.size();
         }
     }
-
+/*
     std::cout << "\n=== SECTION BASES ===\n";
 
     for (const auto& [name, addr] : sectionBases) {
         std::cout << name << " -> 0x"
                   << std::hex << addr << std::dec << "\n";
-    }
+    }*/
 }
 
+//racunanje konacnih adresa svakog simbola
 void Linker::resolveSymbols()
 {
     resolvedSymbols.clear();
@@ -391,7 +365,7 @@ void Linker::resolveSymbols()
         rs.address = it->second + sym.value;
         resolvedSymbols.push_back(rs);
     }
-
+/*
     std::cout << "\n=== RESOLVED SYMBOLS ===\n";
 
     for (const auto& symbol : resolvedSymbols) {
@@ -403,7 +377,7 @@ void Linker::resolveSymbols()
               << std::dec
               << " global=" << symbol.global
               << "\n";
-    }
+    }*/
 }
 
 uint32_t Linker::findResolvedSymbolAddress(const std::string& name, int referencingObjectIndex)
