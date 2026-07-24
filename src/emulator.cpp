@@ -3,8 +3,96 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <poll.h>
 #include <sstream>
 #include <stdexcept>
+#include <unistd.h>
+
+Emulator::~Emulator()
+{
+    restoreTerminal();
+}
+
+void Emulator::configureTerminal()
+{
+    if (!isatty(STDIN_FILENO)) {
+        return;
+    }
+
+    if (tcgetattr(STDIN_FILENO, &originalTerminalSettings) == -1) {
+        throw std::runtime_error("Cannot read terminal settings");
+    }
+
+    termios settings = originalTerminalSettings;
+    settings.c_lflag &= ~(ICANON | ECHO);
+    settings.c_cc[VMIN] = 0;
+    settings.c_cc[VTIME] = 0;
+
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &settings) == -1) {
+        throw std::runtime_error("Cannot configure terminal");
+    }
+
+    terminalConfigured = true;
+}
+
+void Emulator::restoreTerminal()
+{
+    if (!terminalConfigured) {
+        return;
+    }
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &originalTerminalSettings);
+    terminalConfigured = false;
+}
+
+void Emulator::checkTerminal()
+{
+    pollfd input{};
+    input.fd = STDIN_FILENO;
+    input.events = POLLIN;
+
+    int result = poll(&input, 1, 0);
+    if (result <= 0 || !(input.revents & POLLIN)) {
+        return;
+    }
+
+    char character;
+    if (read(STDIN_FILENO, &character, 1) == 1) {
+        terminalCharacter = static_cast<uint8_t>(character);
+        terminalInterruptPending = true;
+    }
+}
+
+uint32_t Emulator::getTimerPeriod() const
+{
+    switch (timerConfig) {
+    case 0: return 500;
+    case 1: return 1000;
+    case 2: return 1500;
+    case 3: return 2000;
+    case 4: return 5000;
+    case 5: return 10000;
+    case 6: return 30000;
+    case 7: return 60000;
+    default: return 500;
+    }
+}
+
+void Emulator::resetTimer()
+{
+    nextTimerInterrupt = std::chrono::steady_clock::now() + std::chrono::milliseconds(getTimerPeriod());
+}
+
+void Emulator::checkTimer()
+{
+    if (std::chrono::steady_clock::now() < nextTimerInterrupt) {
+        return;
+    }
+
+    timerInterruptPending = true;
+    resetTimer();
+}
 
 uint8_t Emulator::read8(uint32_t address) const
 {
@@ -44,20 +132,51 @@ void Emulator::loadHexFile(const std::string& filename)
         }
 
         std::string addressText = line.substr(0, colon);
-        uint32_t address = std::stoul(addressText, nullptr, 16);
+        size_t parsedAddressCharacters = 0;
+        uint64_t address = std::stoull(
+            addressText,
+            &parsedAddressCharacters,
+            16
+        );
+
+        if (parsedAddressCharacters != addressText.size() ||
+            address > std::numeric_limits<uint32_t>::max())
+        {
+            throw std::runtime_error("Invalid hex address: " + addressText);
+        }
 
         std::string bytesText = line.substr(colon + 1);
         std::stringstream ss(bytesText);
 
         std::string byteText;
-        uint32_t currentAddress = address;
+        uint64_t currentAddress = address;
+        bool hasBytes = false;
 
         while (ss >> byteText) {
-            uint8_t byte =
-                static_cast<uint8_t>(std::stoul(byteText, nullptr, 16));
+            size_t parsedByteCharacters = 0;
+            uint64_t byteValue = std::stoull(
+                byteText,
+                &parsedByteCharacters,
+                16
+            );
 
-            write8(currentAddress, byte);
+            if (parsedByteCharacters != byteText.size() ||
+                byteValue > 0xFF ||
+                currentAddress > std::numeric_limits<uint32_t>::max())
+            {
+                throw std::runtime_error("Invalid hex byte: " + byteText);
+            }
+
+            write8(
+                static_cast<uint32_t>(currentAddress),
+                static_cast<uint8_t>(byteValue)
+            );
             currentAddress++;
+            hasBytes = true;
+        }
+
+        if (!hasBytes) {
+            throw std::runtime_error("Hex line has no data: " + line);
         }
     }
 }
@@ -84,14 +203,13 @@ void Emulator::printMemory() const
 uint32_t Emulator::read32(uint32_t address)
 {
     if (address == 0xFFFFFF04) {
-    uint8_t ch = terminalCharacter.load();
+        uint8_t ch = terminalCharacter;
 
-    terminalCharacter.store(0);
-    terminalInterruptPending.store(false);
+        terminalCharacter = 0;
+        terminalInterruptPending = false;
 
-    return (uint32_t)ch;
-
-}
+        return static_cast<uint32_t>(ch);
+    }
 
     return
         ((uint32_t)read8(address + 0)) |
@@ -103,7 +221,6 @@ uint32_t Emulator::read32(uint32_t address)
 void Emulator::write32(uint32_t address, uint32_t value)
 {
     if (address == 0xFFFFFF00) {
-      //  std::cerr << "term_out value=0x" << std::hex << value << std::dec << "\n";
 
         std::cout << (char)(value & 0xFF);
         std::cout.flush();
@@ -111,7 +228,8 @@ void Emulator::write32(uint32_t address, uint32_t value)
     }
 
     if (address == 0xFFFFFF10) {
-        timerConfig.store(value);
+        timerConfig = value;
+        resetTimer();
         return;
     }
 
@@ -126,11 +244,8 @@ void Emulator::run()
     gpr[15] = 0x40000000; // pc entry
     gpr[14] = 0x10000000; // sp entry
 
-    terminalThread = std::thread(&Emulator::terminalWorker, this);
-    terminalThread.detach();
-
-    timerThread = std::thread(&Emulator::timerWorker, this);
-    timerThread.detach();
+    configureTerminal();
+    resetTimer();
 
     while (true) {
         uint32_t pc = gpr[15];
@@ -150,6 +265,8 @@ void Emulator::run()
 
     switch (oc) {
         case 0x0: // halt
+            restoreTerminal();
+            std::cout << "-----------------------------------------------------------------\n";
             std::cout << "Emulated processor executed halt instruction\n";
             printRegisters();
             return;
@@ -165,8 +282,8 @@ void Emulator::run()
             if (mod == 0) gpr[a] = gpr[b] + gpr[c];
             else if (mod == 1) gpr[a] = gpr[b] - gpr[c];
             else if (mod == 2) gpr[a] = gpr[b] * gpr[c];
-            else if (mod == 3) gpr[a] = gpr[b] / gpr[c];
-            else throw std::runtime_error("Invalid arithmetic modifier");
+            else if (mod == 3 && gpr[c] != 0) gpr[a] = gpr[b] / gpr[c];
+            else enterInterrupt(1);
             break;
 
         case 0x6: // not/and/or/xor
@@ -174,13 +291,16 @@ void Emulator::run()
             else if (mod == 1) gpr[a] = gpr[b] & gpr[c];
             else if (mod == 2) gpr[a] = gpr[b] | gpr[c];
             else if (mod == 3) gpr[a] = gpr[b] ^ gpr[c];
-            else throw std::runtime_error("Invalid logic modifier");
+            else enterInterrupt(1);
             break;
 
         case 0x7: // shl/shr
-            if (mod == 0) gpr[a] = gpr[b] << gpr[c];
+            if (gpr[c] >= 32) {
+                enterInterrupt(1);
+            }
+            else if (mod == 0) gpr[a] = gpr[b] << gpr[c];
             else if (mod == 1) gpr[a] = gpr[b] >> gpr[c];
-            else throw std::runtime_error("Invalid shift modifier");
+            else enterInterrupt(1);
             break;
 
         case 0x8: // store
@@ -196,12 +316,13 @@ void Emulator::run()
                 write32(addr, gpr[c]);
             }
             else {
-                throw std::runtime_error("Invalid store modifier");
+                enterInterrupt(1);
             }
             break;
         case 0x9: // load / csr
             if (mod == 0x0) {
-                gpr[a] = csr[b];
+                if (b < 3) gpr[a] = csr[b];
+                else enterInterrupt(1);
             }
             else if (mod == 0x1) {
                     gpr[a] = gpr[b] + d;
@@ -214,17 +335,25 @@ void Emulator::run()
                 gpr[b] = gpr[b] + d;
             }
             else if (mod == 0x4) {
-                csr[a] = gpr[b];
+                if (a < 3) csr[a] = gpr[b];
+                else enterInterrupt(1);
             }
             else if (mod == 0x5) {
-                csr[a] = csr[b] | d;
+                if (a < 3 && b < 3) csr[a] = csr[b] | d;
+                else enterInterrupt(1);
             }
             else if (mod == 0x6) {
-                csr[a] = read32(gpr[b] + gpr[c] + d);
+                if (a < 3) csr[a] = read32(gpr[b] + gpr[c] + d);
+                else enterInterrupt(1);
             }
             else if (mod == 0x7) {
-                csr[a] = read32(gpr[b]);
-                gpr[b] = gpr[b] + d;
+                if (a < 3) {
+                    csr[a] = read32(gpr[b]);
+                    gpr[b] = gpr[b] + d;
+                }
+                else {
+                    enterInterrupt(1);
+                }
             }
             else if (mod == 0x8){
                 gpr[15] = read32(gpr[14]);
@@ -234,7 +363,7 @@ void Emulator::run()
                 gpr[14] += 4;
             }
             else {
-                throw std::runtime_error("Invalid load modifier");
+                enterInterrupt(1);
             }
             break;
         case 0x2: // call
@@ -251,7 +380,7 @@ void Emulator::run()
                 gpr[15] = read32(gpr[a] + gpr[b] + d);
             }
             else {
-                throw std::runtime_error("Invalid call modifier");
+                enterInterrupt(1);
             }
             break;
 
@@ -293,7 +422,7 @@ void Emulator::run()
                 }
             }
             else {
-                throw std::runtime_error("Invalid jump modifier");
+                enterInterrupt(1);
             }
             break;
         case 0x1: // INT
@@ -306,31 +435,27 @@ void Emulator::run()
 
 
         gpr[0] = 0;
-        //TERMINAL
-        if (terminalInterruptPending.load()) {
+        checkTerminal();
+        checkTimer();
 
-            //std::cerr << "Trying terminal interrupt\n";
-
+        if (terminalInterruptPending) {
             bool globalMasked = csr[0] & (1 << 2);
             bool terminalMasked = csr[0] & (1 << 1);
             bool handlerSet = csr[1] != 0;
 
-            //std::cerr << "globalMasked=" << globalMasked << " terminalMasked=" << terminalMasked << "\n";
-
             if (handlerSet && !globalMasked && !terminalMasked) {
-                terminalInterruptPending.store(false);
+                terminalInterruptPending = false;
                 enterInterrupt(3);
             }
         }
 
-        //TIMER
-        if (timerInterruptPending.load()) {
+        if (timerInterruptPending) {
             bool globalMasked = csr[0] & (1 << 2);
             bool timerMasked = csr[0] & 1;
             bool handlerSet = csr[1] != 0;
 
             if (handlerSet && !globalMasked && !timerMasked) {
-                timerInterruptPending.store(false);
+                timerInterruptPending = false;
                 enterInterrupt(2);
             }
         }
@@ -343,14 +468,18 @@ void Emulator::printRegisters() const
     std::cout << "Emulated processor state:\n";
 
     for (int i = 0; i < 16; i++) {
-        std::cout << "r" << i << "=0x"
+        if (i % 4 == 0 && i < 10) {
+            std::cout << " ";
+        }
+
+        std::cout << "r" << std::dec << i << "=0x"
                   << std::hex << std::setw(8) << std::setfill('0')
                   << gpr[i];
 
         if (i % 4 == 3) {
             std::cout << "\n";
         } else {
-            std::cout << " ";
+            std::cout << "    ";
         }
     }
 
@@ -379,43 +508,4 @@ void Emulator::enterInterrupt(uint32_t causeValue)
 
     csr[0] |= 0x4;
     gpr[15] = csr[1];
-}
-
-void Emulator::terminalWorker()
-{
-    while (true) {
-        char ch;
-        std::cin.get(ch);
-
-        if (ch == '\n') {
-            continue;
-        }
-
-        terminalCharacter.store((uint8_t)ch);
-        terminalInterruptPending.store(true);
-    }
-}
-
-void Emulator::timerWorker()
-{
-    while (true) {
-        uint32_t cfg = timerConfig.load();
-        uint32_t period;
-
-        switch (cfg) {
-        case 0: period = 500; break;
-        case 1: period = 1000; break;
-        case 2: period = 1500; break;
-        case 3: period = 2000; break;
-        case 4: period = 5000; break;
-        case 5: period = 10000; break;
-        case 6: period = 30000; break;
-        case 7: period = 60000; break;
-        default: period = 500; break;
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(period));
-
-        timerInterruptPending.store(true);
-    }
 }

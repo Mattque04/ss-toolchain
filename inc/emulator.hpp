@@ -3,28 +3,34 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <atomic>
-#include <thread>
 #include <chrono>
+#include <termios.h>
 
 class Emulator {
 public:
+    ~Emulator();
+
     void loadHexFile(const std::string& filename);
     void printMemory() const;
     void run();
 
 private:
-    //terminal things
-    std::atomic<bool> terminalInterruptPending = false;
-    std::atomic<uint8_t> terminalCharacter = 0;
-    std::thread terminalThread;
-    void terminalWorker();
+    bool terminalInterruptPending = false;
+    uint8_t terminalCharacter = 0;
+    bool terminalConfigured = false;
+    termios originalTerminalSettings{};
 
-    //timer things
-    std::atomic<bool> timerInterruptPending = false;
-    std::atomic<uint32_t> timerConfig = 0;
-    std::thread timerThread;
-    void timerWorker();
+    void configureTerminal();
+    void restoreTerminal();
+    void checkTerminal();
+
+    bool timerInterruptPending = false;
+    uint32_t timerConfig = 0;
+    std::chrono::steady_clock::time_point nextTimerInterrupt;
+
+    uint32_t getTimerPeriod() const;
+    void resetTimer();
+    void checkTimer();
 
     void push32(uint32_t value);
     uint32_t pop32();
