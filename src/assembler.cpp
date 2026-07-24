@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iomanip>
 
-//Private functions
 void Assembler::checkDisp12(int32_t value)
 {
     if (value < -2048 || value > 2047) {
@@ -16,7 +15,6 @@ void Assembler::checkDisp12(int32_t value)
 void Assembler::emitInstruction(uint8_t oc, uint8_t mod, uint8_t a, uint8_t b, uint8_t c, int16_t disp)
 {
     uint32_t d = disp & 0x0FFF;
-
     uint32_t instr =
         ((uint32_t)oc  << 28) |
         ((uint32_t)mod << 24) |
@@ -31,23 +29,16 @@ void Assembler::emitInstruction(uint8_t oc, uint8_t mod, uint8_t a, uint8_t b, u
 void Assembler::emit32(uint32_t value)
 
 {
-
     if (currentSection == -1) {
-
         throw std::runtime_error("instruction outside of section");
-
     }
 
     Section& sec = sections[currentSection];
 
     sec.data.push_back(value & 0xFF);
-
     sec.data.push_back((value >> 8) & 0xFF);
-
     sec.data.push_back((value >> 16) & 0xFF);
-
     sec.data.push_back((value >> 24) & 0xFF);
-
 }
 
 int Assembler::getOrCreateSymbol(const std::string& name)

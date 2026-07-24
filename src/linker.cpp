@@ -422,17 +422,13 @@ LinkSection* Linker::findMergedSection(const std::string& name)
 
 void Linker::write32(LinkSection& section, uint32_t offset, uint32_t value)
 {
-    section.data[offset + 0] =
-        value & 0xFF;
+    section.data[offset + 0] = value & 0xFF;
 
-    section.data[offset + 1] =
-        (value >> 8) & 0xFF;
+    section.data[offset + 1] = (value >> 8) & 0xFF;
+    
+    section.data[offset + 2] = (value >> 16) & 0xFF;
 
-    section.data[offset + 2] =
-        (value >> 16) & 0xFF;
-
-    section.data[offset + 3] =
-        (value >> 24) & 0xFF;
+    section.data[offset + 3] = (value >> 24) & 0xFF;
 }
 
 void Linker::resolveRelocations()
