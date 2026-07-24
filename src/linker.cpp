@@ -673,3 +673,82 @@ void Linker::writeRelocatableObject(const std::string& filename)
 //                 }
 //             }}
 //         }}
+
+
+
+
+
+
+
+// weak maybe easier buildglobalsymbol
+
+// void Linker::buildGlobalSymbolTable()
+//   {
+//       globalSymbols.clear();
+
+//       for (int objIdx = 0; objIdx < (int)objectFiles.size(); objIdx++)
+//       {
+//           const ObjectFile& obj = objectFiles[objIdx];
+
+//           for (const auto& sym : obj.symbols) {
+//               if (!sym.defined) {
+//                   continue;
+//               }
+
+//               GlobalSymbol gs;
+
+//               gs.objectIndex = objIdx;
+//               gs.name = sym.name;
+//               gs.global = sym.global;
+//               gs.weak = sym.weak;
+
+//               if (sym.section == "ABS") {
+//                   gs.section = "ABS";
+//                   gs.value = sym.value;
+//               }
+//               else {
+//                   const SectionPlacement* placement =
+//                       findPlacement(
+//                           placements,
+//                           objIdx,
+//                           sym.section
+//                       );
+
+//                   if (!placement) {
+//                       throw std::runtime_error(
+//                           "Missing placement for section: "
+//                           +
+//                           sym.section
+//                       );
+//                   }
+
+//                   gs.section = sym.section;
+//                   gs.value = sym.value + placement->offset;
+//               }
+
+//               if (!gs.global) {
+//                   globalSymbols.push_back(gs);
+//                   continue;
+//               }
+
+//               GlobalSymbol* existing = findGlobalSymbol(globalSymbols, gs.name);
+
+//               if (existing == nullptr) {
+//                   globalSymbols.push_back(gs);
+//                   continue;
+//               }
+
+//               if (existing->weak && !gs.weak) {
+//                   *existing = gs;
+//                   continue;
+//               }
+
+//               if (!existing->weak && !gs.weak) {
+//                   throw std::runtime_error(
+//                       "Multiple definition of symbol: " +
+//                       gs.name
+//                   );
+//               }
+//           }
+//       }
+//   }
