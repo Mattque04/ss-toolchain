@@ -22,12 +22,14 @@ ObjectFile Linker::readObjectFile(const std::string& filename)
     std::string token;
 
     in >> token;
-    if (token != "#SS_OBJECT") {
+    if (token != "#SS_OBJECT") 
+    {
         throw std::runtime_error("Invalid object file: " + filename);
     }
 
     while (in >> token) {
-        if (token == "[SECTIONS]") {
+        if (token == "[SECTIONS]") 
+        {
             int count;
             in >> count;
 
@@ -46,7 +48,8 @@ ObjectFile Linker::readObjectFile(const std::string& filename)
                 obj.sections.push_back(sec);
             }
         }
-        else if (token == "[SYMBOLS]") {
+        else if (token == "[SYMBOLS]") 
+        {
             int count;
             in >> count;
 
@@ -86,9 +89,7 @@ ObjectFile Linker::readObjectFile(const std::string& filename)
     return obj;
 }
 
-static bool globalSymbolExists(
-      const std::vector<GlobalSymbol>& symbols,
-      const std::string& name)
+static bool globalSymbolExists(const std::vector<GlobalSymbol>& symbols, const std::string& name)
   {
       for (const auto& symbol : symbols) {
           if (symbol.global && symbol.name == name) {
@@ -140,7 +141,7 @@ void Linker::mergeSections()
                 sec.name,
                 offset
             });
-            //ovo bukvalno radi dodaj na kraj merged.data sve iz trenutne sekcije i time prosirujemo merged sekciju
+            // just adding current section at the end of merged section
             merged->data.insert(
                 merged->data.end(),
                 sec.data.begin(),
@@ -180,8 +181,7 @@ void Linker::addObjectFile(const ObjectFile& obj)
 static const SectionPlacement* findPlacement(const std::vector<SectionPlacement>& placements, int objectIndex, const std::string& sectionName)
 {
     for (const auto& p : placements) {
-        if (p.objectIndex == objectIndex &&
-            p.sectionName == sectionName)
+        if (p.objectIndex == objectIndex && p.sectionName == sectionName)
         {
             return &p;
         }
@@ -279,9 +279,7 @@ void Linker::buildGlobalRelocationTable()
             gr.section = rel.section;
             gr.symbol = rel.symbol;
 
-            gr.offset =
-                rel.offset +
-                placement->offset;
+            gr.offset = rel.offset + placement->offset;
 
             globalRelocations.push_back(gr);
         }
@@ -300,8 +298,7 @@ void Linker::buildGlobalRelocationTable()
     }*/
 }
 
-void Linker::assignSectionAddresses(
-    const std::vector<std::pair<std::string, uint32_t>>& placeOptions)
+void Linker::assignSectionAddresses(const std::vector<std::pair<std::string, uint32_t>>& placeOptions)
 {
     sectionBases.clear();
 
@@ -337,7 +334,7 @@ void Linker::assignSectionAddresses(
     }*/
 }
 
-//racunanje konacnih adresa svakog simbola
+// calculating final address for every symbol
 void Linker::resolveSymbols()
 {
     resolvedSymbols.clear();
@@ -402,8 +399,7 @@ uint32_t Linker::findResolvedSymbolAddress(const std::string& name, int referenc
       throw std::runtime_error("Unknown symbol: " + name);
 }
 
-LinkSection* Linker::findMergedSection(
-    const std::string& name)
+LinkSection* Linker::findMergedSection(const std::string& name)
 {
     for (auto& sec : mergedSections)
     {
@@ -416,10 +412,7 @@ LinkSection* Linker::findMergedSection(
     return nullptr;
 }
 
-void Linker::write32(
-    LinkSection& section,
-    uint32_t offset,
-    uint32_t value)
+void Linker::write32(LinkSection& section, uint32_t offset, uint32_t value)
 {
     section.data[offset + 0] =
         value & 0xFF;

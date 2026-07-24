@@ -63,7 +63,6 @@ int Assembler::getOrCreateSymbol(const std::string& name)
     return id;
 }
 
-//Public functions
 void Assembler::startSection(const std::string& name)
 {
     for (int i = 0; i < (int)sections.size(); i++) {
@@ -349,18 +348,14 @@ void Assembler::emitLdMemRegLiteral(int gprAddr, int32_t disp, int gprD)
 void Assembler::emitLdImmediateSymbol(const std::string& symbolName, int gprD)
 
 {
-
     emitLoadSymbolAddress(symbolName, gprD);
-
 }
+
 void Assembler::emitLdMemSymbol(const std::string& symbolName, int gprD)
 
 {
-
     emitLoadSymbolAddress(symbolName, gprD);
-
     emitLdMemReg(gprD, gprD);
-
 }
 
 void Assembler::emitLdMemRegSymbol(int gprAddr, const std::string& symbolName, int gprD)
@@ -380,11 +375,8 @@ void Assembler::emitLdMemRegSymbol(int gprAddr, const std::string& symbolName, i
 void Assembler::emitStMemSymbol(int gprS, const std::string& symbolName)
 
 {
-
     emitLoadSymbolAddress(symbolName, 13);
-
     emitStMemReg(gprS, 13);
-
 }
 
 void Assembler::emitStMemReg(int gprS, int gprAddr)
@@ -504,15 +496,10 @@ void Assembler::printState()
     const Relocation& r = relocations[i];
 
     std::cout << i
-
               << ": section=" << r.sectionId
-
               << " offset=" << r.offset
-
               << " symbol=" << r.symbol
-
               << std::endl;
-
 }
 }
 

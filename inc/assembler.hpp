@@ -155,25 +155,20 @@ public:
     // st %r1, [%r2 + main]
     void emitStMemRegSymbol(int gprS, int gprAddr, const std::string& symbolName);
 
-    // upis predmetnog programa u .o
     void writeObjectFile(const std::string& filename);
 
-    // debug ispis internog stanja
     void printState();
 
     void emitAscii(const std::string& text);
 
 private:
-    // provera da li displacement staje u 12 bita
+
     void checkDisp12(int32_t value);
 
-    // emitovanje jedne masinske instrukcije
     void emitInstruction(uint8_t oc, uint8_t mod, uint8_t a, uint8_t b, uint8_t c, int16_t disp);
 
-    // emitovanje 4 bajta u trenutnu sekciju
     void emit32(uint32_t value);
 
-    // vraca postojeci simbol ili pravi novi
     int getOrCreateSymbol(const std::string& name);
 
     void emitLoadAddress(uint32_t value, int gprD);
