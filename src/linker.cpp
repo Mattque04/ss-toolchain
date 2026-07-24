@@ -89,6 +89,14 @@ ObjectFile Linker::readObjectFile(const std::string& filename)
     return obj;
 }
 
+static GlobalSymbol* findGlobalSymbol(std::vector<GlobalSymbol>& symbols, const std::string& name){
+    for(auto& i : symbols){
+        if(i.global && i.name==name)
+            return &i;
+    }
+    return nullptr;
+}
+
 static bool globalSymbolExists(const std::vector<GlobalSymbol>& symbols, const std::string& name)
   {
       for (const auto& symbol : symbols) {
@@ -596,3 +604,72 @@ void Linker::writeRelocatableObject(const std::string& filename)
 
     out << "\n[END]\n";
 }
+
+
+//  void Linker::allocateCommonSymbols()
+//   {
+//       bool hasCommon = false;
+
+//       for (const auto& symbol : globalSymbols) {
+//           if (symbol.section == "COM") {
+//               hasCommon = true;
+//               break;
+//           }
+//       }
+
+//       if (!hasCommon) {
+//           return;
+//       }
+
+//       LinkSection* bss = findSection(mergedSections,
+//       "bss");
+
+//       if (!bss) {
+//           LinkSection section;
+//           section.name = "bss";
+//           mergedSections.push_back(section);
+//           bss = &mergedSections.back();
+//       }
+
+//       for (auto& symbol : globalSymbols) {
+//           if (symbol.section != "COM") {
+//               continue;
+//           }
+
+//           uint32_t size = symbol.value;
+//           uint32_t offset = bss->data.size();
+
+//           bss->data.resize(offset + size, 0);
+
+//           symbol.section = "bss";
+//           symbol.value = offset;
+//       }
+//   }
+        // BUILD GLOBALSYMBOLS CHANGE
+//   for (int objIdx = 0; objIdx < (int)objectFiles.size(); objIdx++) {
+
+//         const ObjectFile& obj = objectFiles[objIdx];
+//     for (const auto& sym : obj.symbols) {
+//             if(!(sym.section=="COM"))
+//                 continue;
+//             GlobalSymbol* s2= findGlobalSymbol(globalSymbols, sym.name);
+//             if(!s2)
+//             {
+//                 GlobalSymbol gs;
+//                 gs.objectIndex = objIdx;
+//                 gs.name = sym.name;
+//                 gs.section = "COM";
+//                 gs.value = sym.value;
+//                 gs.global = sym.global;
+//                 globalSymbols.push_back(gs);
+//                 continue;
+//             }
+//             else{
+//                 if(s2->section== "COM"){
+//                 if(s2->value<sym.value){
+//                     s2->name=sym.name;
+//                     s2->objectIndex=objIdx;
+//                     s2->value=sym.value;
+//                 }
+//             }}
+//         }}
